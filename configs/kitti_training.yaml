@@ -1,0 +1,89 @@
+# S2Net KITTI Training Configuration
+
+# Model configuration
+model:
+  input_dim: 3
+  hidden_dim: 256
+  latent_dim: 128
+  num_points: 1024
+  num_lstm_layers: 2
+  num_pyramid_levels: 3
+  use_temporal_variational: false
+  use_multi_scale: false
+  use_uncertainty: true
+  dropout: 0.1
+
+# Training configuration
+training:
+  epochs: 50
+  batch_size: 4  # Smaller batch size for KITTI
+  learning_rate: 1e-4
+  weight_decay: 1e-5
+  kl_weight: 1.0
+  reconstruction_weight: 1.0
+  temporal_weight: 0.1
+  uncertainty_weight: 0.1
+  gradient_clip_norm: 1.0
+
+# Data configuration
+data:
+  dataset: 'kitti'
+  data_path: '/home/pratyush/ISyE_Research/datasets/unzipped/KITTI/dataset/sequences'
+  sequence_length: 10
+  prediction_length: 5
+  num_points: 1024
+  num_workers: 4
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  # KITTI specific settings
+  kitti_sequences: ['00', '01', '02', '03', '04', '05']
+  max_sequence_length: 1000  # Limit sequence length for memory
+
+# Optimizer configuration
+optimizer:
+  type: 'adam'
+  lr: 0.0001
+  weight_decay: 0.00001
+  betas: [0.9, 0.999]
+
+# Scheduler configuration
+scheduler:
+  type: 'reduce_on_plateau'
+  factor: 0.5
+  patience: 5
+  verbose: true
+
+# Loss configuration
+loss:
+  use_emd: false
+  use_temporal: true
+  use_uncertainty: true
+
+# Data augmentation
+augmentation:
+  rotation_range: [-0.1, 0.1]  # Smaller rotation for KITTI
+  translation_range: [-0.2, 0.2]
+  scaling_range: [0.95, 1.05]
+  noise_std: 0.002
+  dropout_prob: 0.02
+
+# Evaluation configuration
+evaluation:
+  num_samples: 5
+  save_predictions: true
+  save_visualizations: true
+
+# System configuration
+system:
+  device: 'cuda'
+  seed: 42
+  validate_every: 5
+  save_every: 10
+  log_every: 10
+
+# Paths
+paths:
+  save_dir: 'checkpoints/kitti/'
+  log_dir: 'logs/kitti/'
+  output_dir: 'evaluation_results/kitti/'
