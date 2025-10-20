@@ -177,7 +177,7 @@ class TemporalVariationalModule(nn.Module):
         
         # Temporal LSTM for modeling latent evolution
         self.temporal_lstm = nn.LSTM(
-            input_size=latent_dim,
+            input_size=input_dim,  # Use input_dim instead of latent_dim
             hidden_size=temporal_hidden_dim,
             num_layers=1,
             batch_first=True

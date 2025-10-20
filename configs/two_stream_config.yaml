@@ -1,0 +1,60 @@
+# Two-Stream S2Net Configuration
+# Optimized for better Chamfer Distance results
+
+model:
+  input_dim: 3
+  hidden_dim: 256
+  latent_dim: 128
+  num_points: 512  # Reduced for faster training
+  num_lstm_layers: 2
+  num_pyramid_levels: 2  # Reduced for faster training
+  use_temporal_variational: true
+  use_multi_scale: false  # Disabled for simplicity
+  dropout: 0.1
+
+data:
+  dataset_name: "kitti"  # or "synthetic" for testing
+  data_path: "/home/pratyush/ISyE_Research/S2Net/data/kitti"
+  batch_size: 4
+  sequence_length: 5
+  prediction_length: 3
+  num_points: 512
+  num_workers: 4
+
+training:
+  num_epochs: 50
+  optimizer:
+    type: "adamw"
+    lr: 0.001
+    weight_decay: 0.0001
+  scheduler:
+    type: "cosine"
+    T_max: 50
+  loss:
+    kl_weight: 0.1  # Reduced KL weight for better reconstruction
+    reconstruction_weight: 1.0
+    deterministic_weight: 0.3  # Lower weight for deterministic stream
+    stochastic_weight: 0.7  # Higher weight for stochastic stream
+    temporal_weight: 0.05  # Small temporal consistency weight
+    use_annealing: true
+    annealing_steps: 1000
+  save_every: 5
+  gradient_clip_norm: 1.0
+
+# Evaluation settings
+evaluation:
+  metrics:
+    - "chamfer_distance"
+    - "hausdorff_distance"
+    - "l2_distance"
+    - "mae"
+    - "rmse"
+  save_predictions: true
+  visualize_predictions: true
+  num_visualizations: 5
+
+# Logging
+logging:
+  log_dir: "logs/two_stream"
+  log_every: 10
+  save_plots: true
