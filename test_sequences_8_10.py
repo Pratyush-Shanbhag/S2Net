@@ -16,8 +16,8 @@ from pathlib import Path
 # Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models.s2net import S2Net
-from data.dataloader import create_dataloader
+from models.s2net_two_stream import TwoStreamS2Net
+from data.kitti_dataloader import create_kitti_dataloaders
 from utils.metrics import chamfer_distance, hausdorff_distance, compute_metrics
 import time
 
@@ -62,8 +62,8 @@ def visualize_point_clouds(points_list, titles=None, save_path=None, figsize=(15
     
     plt.show()
 
-def load_model(device, config_path='configs/simple_kitti.yaml', checkpoint_path='checkpoints/best_model.pth'):
-    """Load the trained S2Net model."""
+def load_model(device, config_path='configs/kitti_two_stream_config.yaml', checkpoint_path='checkpoints/kitti/best_model.pth'):
+    """Load the trained Two-Stream S2Net model."""
     print("Loading model configuration...")
     
     # Load configuration
@@ -74,7 +74,7 @@ def load_model(device, config_path='configs/simple_kitti.yaml', checkpoint_path=
     print(f"Model configuration: {model_config}")
     
     # Create model
-    model = S2Net(
+    model = TwoStreamS2Net(
         input_dim=model_config['input_dim'],
         hidden_dim=model_config['hidden_dim'],
         latent_dim=model_config['latent_dim'],
@@ -83,14 +83,12 @@ def load_model(device, config_path='configs/simple_kitti.yaml', checkpoint_path=
         num_pyramid_levels=model_config['num_pyramid_levels'],
         use_temporal_variational=model_config['use_temporal_variational'],
         use_multi_scale=model_config['use_multi_scale'],
-        use_uncertainty=model_config['use_uncertainty'],
-        use_temporal_decoder=model_config['use_temporal_decoder'],
         dropout=model_config['dropout']
     )
     
     # Load trained weights
     print(f"Loading checkpoint from: {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
@@ -128,10 +126,15 @@ def test_sequence(model, dataloader, sequence_name, device, num_samples=3):
         # Make prediction
         start_time = time.time()
         with torch.no_grad():
-            predictions = model(input_sequence)
+            predictions = model(input_sequence, is_training=False)
             
             if isinstance(predictions, dict):
-                pred_points = predictions['predicted_point_clouds']
+                # Use deterministic predictions for evaluation
+                pred_points = predictions.get('deterministic_predictions', 
+                                       predictions.get('predicted_point_clouds'))
+                if pred_points is None:
+                    # Fallback to any available prediction
+                    pred_points = list(predictions.values())[0]
             else:
                 pred_points = predictions
         
@@ -228,26 +231,27 @@ def main():
     sequences = ['08', '09', '10']
     all_results = {}
     
+    # Load config for dataloader
+    with open('configs/kitti_two_stream_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    
     for seq in sequences:
         print(f"\n{'='*60}")
         print(f"Testing Sequence {seq}")
         print(f"{'='*60}")
         
         try:
+            # Update config for this test sequence
+            test_config = config.copy()
+            test_config['data']['batch_size'] = 1
+            test_config['data']['sequence_length'] = 5
+            test_config['data']['prediction_length'] = 3
+            test_config['data']['num_points'] = 512
+            test_config['data']['num_workers'] = 0
+            test_config['data']['val_sequences'] = [seq]
+            
             # Create data loader for this sequence
-            dataloader = create_dataloader(
-                dataset_name='kitti',
-                data_path='/home/pratyush/ISyE_Research/datasets/unzipped/KITTI/dataset',
-                batch_size=1,
-                sequence_length=5,
-                prediction_length=3,
-                num_points=512,
-                num_workers=0,
-                shuffle=False,
-                is_training=False,
-                kitti_sequences=[seq],
-                max_sequence_length=50  # Limit for testing
-            )
+            _, dataloader = create_kitti_dataloaders(test_config)
             
             print(f"✅ Data loader created for sequence {seq}")
             print(f"   Dataset size: {len(dataloader.dataset)}")

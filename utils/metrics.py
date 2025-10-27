@@ -287,6 +287,74 @@ def compute_sequence_metrics(pred_sequences: torch.Tensor,
     return avg_metrics
 
 
+def compute_chamfer_distance(pred_points: np.ndarray, target_points: np.ndarray) -> float:
+    """
+    Compute Chamfer Distance between predicted and target point clouds using numpy.
+    
+    Args:
+        pred_points: Predicted point clouds [seq_len, num_points, 3]
+        target_points: Target point clouds [seq_len, num_points, 3]
+        
+    Returns:
+        Chamfer distance
+    """
+    total_distance = 0.0
+    seq_len = min(pred_points.shape[0], target_points.shape[0])
+    
+    for t in range(seq_len):
+        pred_t = pred_points[t]  # [num_points, 3]
+        target_t = target_points[t]  # [num_points, 3]
+        
+        # Compute pairwise distances
+        pred_expanded = pred_t[:, np.newaxis, :]  # [num_points, 1, 3]
+        target_expanded = target_t[np.newaxis, :, :]  # [1, num_points, 3]
+        
+        distances = np.linalg.norm(pred_expanded - target_expanded, axis=-1)  # [num_points, num_points]
+        
+        # Chamfer distance: min distance from each pred point to target + min distance from each target point to pred
+        min_dist_pred_to_target = np.min(distances, axis=1)  # [num_points]
+        min_dist_target_to_pred = np.min(distances, axis=0)  # [num_points]
+        
+        chamfer_dist = (np.mean(min_dist_pred_to_target) + np.mean(min_dist_target_to_pred))
+        total_distance += chamfer_dist
+    
+    return total_distance / seq_len
+
+
+def compute_hausdorff_distance(pred_points: np.ndarray, target_points: np.ndarray) -> float:
+    """
+    Compute Hausdorff Distance between predicted and target point clouds using numpy.
+    
+    Args:
+        pred_points: Predicted point clouds [seq_len, num_points, 3]
+        target_points: Target point clouds [seq_len, num_points, 3]
+        
+    Returns:
+        Hausdorff distance
+    """
+    total_distance = 0.0
+    seq_len = min(pred_points.shape[0], target_points.shape[0])
+    
+    for t in range(seq_len):
+        pred_t = pred_points[t]  # [num_points, 3]
+        target_t = target_points[t]  # [num_points, 3]
+        
+        # Compute pairwise distances
+        pred_expanded = pred_t[:, np.newaxis, :]  # [num_points, 1, 3]
+        target_expanded = target_t[np.newaxis, :, :]  # [1, num_points, 3]
+        
+        distances = np.linalg.norm(pred_expanded - target_expanded, axis=-1)  # [num_points, num_points]
+        
+        # Hausdorff distance: max of min distances
+        min_dist_pred_to_target = np.min(distances, axis=1)  # [num_points]
+        min_dist_target_to_pred = np.min(distances, axis=0)  # [num_points]
+        
+        hausdorff_dist = max(np.max(min_dist_pred_to_target), np.max(min_dist_target_to_pred))
+        total_distance += hausdorff_dist
+    
+    return total_distance / seq_len
+
+
 def evaluate_model(model: torch.nn.Module, 
                   dataloader: torch.utils.data.DataLoader,
                   device: str,
